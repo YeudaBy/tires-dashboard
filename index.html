@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="he">
 
 <head>
     <meta charset="UTF-8">
@@ -15,6 +15,7 @@
             height: 100vh;
             font-family: Arial, sans-serif;
             background: #dfe1e2;
+            direction: rtl;
         }
 
         .progress {
@@ -24,6 +25,11 @@
             transform: translate(-50%, -50%);
             width: 100px;
             height: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
         }
 
         .progress .indeterminate {
@@ -46,6 +52,13 @@
             }
         }
 
+        #images-count {
+            text-align: center;
+            margin: 1rem 0;
+            font-size: 1.2rem;
+            color: #333;
+        }
+
         .images-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -61,6 +74,9 @@
             border: 1px solid #ccc;
             border-radius: 5px;
             padding: 0.5rem;
+            background-color: #f1f1f1;
+            gap: 1rem;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
         }
 
         .image-item img {
@@ -80,14 +96,10 @@
         }
 
         .image-item a {
-            margin-top: 0.5rem;
             font-size: 0.9rem;
             color: #00092d;
-            text-decoration: none;
             cursor: pointer;
-            direction: rtl;
             text-align: center;
-            background-color: #f1f1f1;
             padding: 0.25rem 0.5rem;
             border-radius: 5px;
 
@@ -111,9 +123,10 @@
 
     <div class="progress">
         <div class="indeterminate"></div>
-        <h4>Loading...</h6>
+        <h4>טוען נתונים...</h6>
     </div>
 
+    <h5 id="images-count"></h5>
     <div class="images-grid">
         <!-- Images will be displayed here -->
     </div>
@@ -140,16 +153,17 @@
 
         const progress = document.querySelector('.progress');
         const imagesGrid = document.querySelector('.images-grid');
+        const imagesCounter = document.querySelector('#images-count');
 
         const formatLabel = (label) => {
             const [carNumber, uploadTime] = label.split('-');
             const date = new Date(parseInt(uploadTime));
             return `מספר רכב: ${carNumber}, הועלה ב${date.toLocaleString(
                 'he-IL', {
-                    timeZone:'Asia/Jerusalem',
-                    dateStyle: 'full',
-                    timeStyle: 'short'
-                }
+                timeZone: 'Asia/Jerusalem',
+                dateStyle: 'full',
+                timeStyle: 'short'
+            }
             )}`;
         }
 
@@ -159,28 +173,41 @@
                 const list = await listAll(imagesRef);
                 const imagePromises = list.items.map(itemRef => getDownloadURL(itemRef));
 
-                const images = await Promise.all(imagePromises);
+                let images = await Promise.all(imagePromises);
 
-                console.log(images);
+                // Extract upload time from file names and create an array of objects
+                let imagesWithUploadTime = images.map((image, index) => {
+                    const itemRef = list.items[index];
+                    const fileName = itemRef.name;
+                    const uploadTime = fileName.split('-')[1];
+                    return { image, fileName, uploadTime };
+                });
+
+                // Sort images by upload time
+                imagesWithUploadTime.sort((a, b) => {
+                    return b.uploadTime.localeCompare(a.uploadTime);
+                });
+
+                // Update the counter and display images
+                imagesCounter.textContent = `מציג ${imagesWithUploadTime.length} תמונות:`;
+                console.log(imagesWithUploadTime);
 
                 progress.style.display = 'none';
 
-                images.forEach((image, index) => {
-                    const itemRef = list.items[index];
-                    const fileName = itemRef.name;
+                imagesWithUploadTime.forEach(imageObj => {
                     const imgItem = document.createElement('div');
                     imgItem.classList.add('image-item');
 
                     const img = document.createElement('img');
                     img.setAttribute('loading', 'lazy');
-                    img.src = image;
-                    img.alt = fileName;
+                    img.src = imageObj.image;
+                    img.alt = imageObj.fileName;
 
                     const label = document.createElement('a');
-                    label.textContent = formatLabel(fileName);
-                    label.href = image;
+                    label.textContent = formatLabel(imageObj.fileName);
+                    label.href = imageObj.image;
                     label.target = '_blank';
-                    label.download = fileName;
+                    label.download = imageObj.fileName;
 
                     imgItem.appendChild(label);
                     imgItem.appendChild(img);
@@ -189,7 +216,7 @@
                     img.addEventListener('click', () => {
                         const fullScreen = document.querySelector('.full-screen');
                         fullScreen.style.display = 'flex';
-                        fullScreen.innerHTML = `<img src="${image}" style="max-width: 100%; max-height: 100%;">`;
+                        fullScreen.innerHTML = `<img src="${imageObj.image}" style="max-width: 100%; max-height: 100%;">`;
 
                         fullScreen.addEventListener('click', () => {
                             fullScreen.style.display = 'none';
@@ -200,6 +227,8 @@
                 console.error('Error getting images:', error);
             }
         }
+
+
 
         document.addEventListener('DOMContentLoaded', (event) => {
             getImages();
